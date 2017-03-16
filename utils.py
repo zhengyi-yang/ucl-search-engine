@@ -5,104 +5,91 @@ Created on Sun Feb 26 22:28:04 2017
 @author: Zhengyi, Yuan
 """
 
-import sys
-import argparse
 import urlparse
 import requests
+import argparse
 
 from bs4 import BeautifulSoup
-
-def getGoogle(query, max_result=100):
-    return WebRanker(query, max_result).getGoogle()
-
-def getUcl(query, max_result=100):
-    return WebRanker(query, max_result).getUcl()
-
-def getSolr(query, max_result=100):
-    return WebRanker(query, max_result).getSolr()
+from tabulate import tabulate
 
 
-class WebRanker(object):
+def get_google(query, rows=10, num=None):
 
-    def __init__(self, query, max_result=100):
-        self.query = query
-        self.max_result = max_result
+    results = []
+    num = min(rows, 100)
 
-    def getGoogle(self):
-        results = []
+    url = "https://www.google.co.uk/search?q=" + query.replace(' ', '+') + \
+          "+site:ucl.ac.uk&start={start}&num=" + str(num)
 
-        url = "https://www.google.co.uk/search?q=" + \
-            self.query.replace(' ', '+') + \
-            '+site:ucl.ac.uk' + \
-            "&start=%d" + '&num=' + str(self.max_result)
+    useragent = 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36'
+    for i in xrange((rows - 1) / num + 1):
+        r = requests.get(url.format(start=i * num),
+                         headers={'User-agent': useragent})
+        data = r.text
+        soup = BeautifulSoup(data, "lxml")
 
-        useragent = 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36'
-        for i in xrange((self.max_result + 99) / 100):
-            r = requests.get(url % (i * 100), timeout=10,
-                             headers={'User-agent': useragent})
-            data = r.text
-            soup = BeautifulSoup(data, "lxml")
+        for result in soup.select('.g .r a'):
+            domain = result.attrs['href']
+            results.append(url_normalize(domain))
 
-            for result in soup.select('.g .r a'):
-                domain = result.attrs['href']
-                parsedDomain = urlparse.urlparse(domain)
-                results.append(parsedDomain.netloc + parsedDomain.path)
-            
-            if i==0 and len(results)>100:
-                results=results[len(results)-100:]
+    if i == 0 and len(results) > num:
+        results = results[len(results) - num:]
 
-        return results[:self.max_result]
-
-    def getUcl(self):
-        results = []
-
-        url = 'https://search2.ucl.ac.uk/s/search.html?query=' + \
-            self.query.replace(' ', '+') +  \
-            '&collection=website-meta&profile=_website&tab=websites&submit=Go' + \
-            '&start_rank=%d'
+    return results[:rows]
 
 
-        useragent = 'Mozilla/5.0'
-        for i in xrange((self.max_result + 9) / 10):
+def get_ucl(query, rows=10):
+    results = []
 
-            r = requests.get(url % (i * 10 + 1),
-                             timeout=10, headers={'User-agent': useragent})
-            data = r.text
-            soup = BeautifulSoup(data, "lxml")
+    url = 'https://search2.ucl.ac.uk/s/search.html?query=' + query.replace(' ', '+') +  \
+        '&collection=website-meta&profile=_website&tab=websites&submit=Go&start_rank={start}'
 
-            for result in soup.findAll('a', {'class': 'result__link'}):
-                domain = result.text
-                parsedDomain = urlparse.urlparse(domain)
-                results.append(parsedDomain.netloc + parsedDomain.path)
+    i = 1
+    while 1:
+        r = requests.get(url.format(start=i))
+        data = r.text
+        soup = BeautifulSoup(data, "lxml")
 
-        return results[:self.max_result]
+        for result in soup.findAll('a', {'class': 'result__link'}):
+            domain = result.text
+            if urlparse.urlparse(domain).netloc.endswith('ucl.ac.uk'):
+                results.append(url_normalize(domain))
+                if len(results) >= rows:
+                    return results
+        i += 10
 
-    def getSolr(self):
-        url = 'http://138.68.161.137:8983/solr/files/select?wt=json&rows=%d&fl=url&q=\"%s\"' \
-                % (self.max_result, self.query.replace(' ', '+'))
-        json_response = requests.get(url).json()
 
-        response = [r['url'][0] for r in json_response['response']['docs']]
+def get_solr(query, rows=10):
+    url = 'http://138.68.161.137:8983/solr/files/select?wt=json&rows={rows}&fl=url&q=\"{query}\"'
 
-        return response
+    json_response = requests.get(url.format(
+        rows=rows, query=query.replace(' ', '+'))).json()
+
+    response = [url_normalize(r['url'][0])
+                for r in json_response['response']['docs']]
+
+    return response
+
+
+def url_normalize(url):
+    # TO DO
+    return url
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('-q', help='query')
+    parser.add_argument('query', help='query')
+    parser.add_argument('-r', nargs='?', dest='rows', type=int, default=10,
+                        help='the number of results')
     args = parser.parse_args()
 
-    query = args.q
+    query = args.query
+    rows = args.rows
 
-    solr_result = getSolr(query, 10)
+    solr_result = get_solr(query, rows)
+    google_result = get_google(query, rows)
+    url_result = get_ucl(query, rows)
 
-    # print solr_result
+    result = zip(google_result, url_result, solr_result)
 
-    google_result = getGoogle(query, 10)
-
-    url_result = getUcl(query, 10)
-
-    result = zip(google_result,url_result, solr_result)
-    for r in result:
-        print r
-
-
+    print tabulate(result, headers=['google', 'ucl', 'solr'], tablefmt='simple')
