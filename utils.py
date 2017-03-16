@@ -90,6 +90,6 @@ if __name__ == '__main__':
     google_result = get_google(query, rows)
     url_result = get_ucl(query, rows)
 
-    result = zip(google_result, url_result, solr_result)
+    result = zip(range(1,rows+1),google_result, url_result, solr_result)
 
-    print tabulate(result, headers=['google', 'ucl', 'solr'], tablefmt='simple')
+    print tabulate(result, headers=['','google', 'ucl', 'solr'], tablefmt='simple')
