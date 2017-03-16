@@ -2,9 +2,11 @@
 """
 Created on Sun Feb 26 22:28:04 2017
 
-@author: Zhengyi
+@author: Zhengyi, Yuan
 """
 
+import sys
+import argparse
 import urlparse
 import requests
 
@@ -13,9 +15,11 @@ from bs4 import BeautifulSoup
 def getGoogle(query, max_result=100):
     return WebRanker(query, max_result).getGoogle()
 
-
 def getUcl(query, max_result=100):
     return WebRanker(query, max_result).getUcl()
+
+def getSolr(query, max_result=100):
+    return WebRanker(query, max_result).getSolr()
 
 
 class WebRanker(object):
@@ -57,6 +61,7 @@ class WebRanker(object):
             '&collection=website-meta&profile=_website&tab=websites&submit=Go' + \
             '&start_rank=%d'
 
+
         useragent = 'Mozilla/5.0'
         for i in xrange((self.max_result + 9) / 10):
 
@@ -71,3 +76,33 @@ class WebRanker(object):
                 results.append(parsedDomain.netloc + parsedDomain.path)
 
         return results[:self.max_result]
+
+    def getSolr(self):
+        url = 'http://138.68.161.137:8983/solr/files/select?wt=json&rows=%d&fl=url&q=\"%s\"' \
+                % (self.max_result, self.query.replace(' ', '+'))
+        json_response = requests.get(url).json()
+
+        response = [r['url'][0] for r in json_response['response']['docs']]
+
+        return response
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-q', help='query')
+    args = parser.parse_args()
+
+    query = args.q
+
+    solr_result = getSolr(query, 10)
+
+    # print solr_result
+
+    google_result = getGoogle(query, 10)
+
+    url_result = getUcl(query, 10)
+
+    result = zip(google_result,url_result, solr_result)
+    for r in result:
+        print r
+
+
