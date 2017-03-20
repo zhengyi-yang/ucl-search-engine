@@ -13,32 +13,36 @@ from bs4 import BeautifulSoup
 from tabulate import tabulate
 
 
-def get_google(query, rows=10, num=None):
+def get_google(query, max_rows=10, num=None):
 
     results = []
-    num = min(rows, 100)
+    num = min(max_rows, 100)
 
     url = "https://www.google.co.uk/search?q=" + query.replace(' ', '+') + \
           "+site:ucl.ac.uk&start={start}&num=" + str(num)
 
     useragent = 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36'
-    for i in xrange((rows - 1) / num + 1):
+    for i in xrange((max_rows - 1) / num + 1):
         r = requests.get(url.format(start=i * num),
                          headers={'User-agent': useragent})
         data = r.text
         soup = BeautifulSoup(data, "lxml")
 
-        for result in soup.select('.g .r a'):
+        found = soup.select('.g .r a')
+        if not found:
+            break
+
+        for result in found:
             domain = result.attrs['href']
             results.append(url_normalize(domain))
 
     if i == 0 and len(results) > num:
         results = results[len(results) - num:]
 
-    return results[:rows]
+    return results[:max_rows]
 
 
-def get_ucl(query, rows=10):
+def get_ucl(query, max_rows=10):
     results = []
 
     url = 'https://search2.ucl.ac.uk/s/search.html?query=' + query.replace(' ', '+') +  \
@@ -50,20 +54,26 @@ def get_ucl(query, rows=10):
         data = r.text
         soup = BeautifulSoup(data, "lxml")
 
-        for result in soup.findAll('a', {'class': 'result__link'}):
+        found = soup.findAll('a', {'class': 'result__link'})
+        if not found:
+            break
+
+        for result in found:
             domain = result.text
             if urlparse.urlparse(domain).netloc.endswith('ucl.ac.uk'):
                 results.append(url_normalize(domain))
-                if len(results) >= rows:
-                    return results
+                if len(results) >= max_rows:
+                    break
         i += 10
 
+    return results
 
-def get_solr(query, rows=10):
-    url = 'http://138.68.161.137:8983/solr/files/select?wt=json&rows={rows}&fl=url&q=\"{query}\"'
+
+def get_solr(query, max_rows=10):
+    url = 'http://138.68.161.137:8983/solr/files/select?wt=json&rows={max_rows}&fl=url&q=\"{query}\"'
 
     json_response = requests.get(url.format(
-        rows=rows, query=query.replace(' ', '+'))).json()
+        max_rows=max_rows, query=query.replace(' ', '+'))).json()
 
     response = [url_normalize(r['url'][0])
                 for r in json_response['response']['docs']]
