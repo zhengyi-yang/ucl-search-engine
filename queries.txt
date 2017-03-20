@@ -1,0 +1,55 @@
+
+# word
+home
+internship
+computer
+neurosciences
+physics
+maths
+image
+careers
+movies
+education
+chinese
+epidemiology
+toilet
+chandler
+edinburg
+Australia
+Alumni
+ranking
+Accommodation
+Studentships
+Brexit
+
+
+# phrase
+english language
+conditional offer
+computer science
+data science
+Institute of Making
+nobel prize
+new student centre 
+book a room
+computer science entry requirements
+imperial college london
+ELECTRONIC & ELECTRICAL ENGINEERING
+CHRISTOPHER INGOLD BUILDING
+
+
+# people
+Tao Cheng
+jun wang
+Emine Yilmaz
+Jack Saunders
+John Smith
+Dario Alfè
+
+
+# sentence
+Has anyone got an offer from UCL for Sept 2016 start?
+is ucl a good university or not
+how is the weather in london
+what is the full name of ucl
+to be or not to be
