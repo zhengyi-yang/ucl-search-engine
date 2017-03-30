@@ -55,10 +55,19 @@ how is the weather in london
 what is the full name of ucl
 to be or not to be
 
+
 # typos
 sfotware systems
 prospectve
-contempor
+contemporar
 data miningg
 Micrsoft
 neurosceince
+
+# with special characters
+plug-in
+UK's
+96%
+Rice's theorem
+2.5 hours
+2016-17
