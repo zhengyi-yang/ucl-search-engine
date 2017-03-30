@@ -2,7 +2,7 @@
 
 
 
-We may use one of the following open source IR package: 
+We are using both of the open source IR packages below: 
 - [solr](https://lucene.apache.org/solr) and [nutch](https://nutch.apache.org/)
 
 
