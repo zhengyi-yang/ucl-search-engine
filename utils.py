@@ -19,7 +19,7 @@ def get_google(query, max_rows=10, num=None):
     num = min(max_rows, 100)
 
     url = "https://www.google.co.uk/search?q=" + query.replace(' ', '+') + \
-          "+site:ucl.ac.uk&start={start}&num=" + str(num)
+          "+site:cs.ucl.ac.uk&start={start}&num=" + str(num)
 
     useragent = 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36'
     for i in xrange((max_rows - 1) / num + 1):
@@ -36,8 +36,8 @@ def get_google(query, max_rows=10, num=None):
             domain = result.attrs['href']
             results.append(url_normalize(domain))
 
-    if i == 0 and len(results) > num:
-        results = results[len(results) - num:]
+        if i == 0 and len(results) > num:
+            results = results[len(results) - num:]
 
     return results[:max_rows]
 
@@ -60,17 +60,17 @@ def get_ucl(query, max_rows=10):
 
         for result in found:
             domain = result.text
-            if urlparse.urlparse(domain).netloc.endswith('ucl.ac.uk'):
+            if urlparse.urlparse(domain).netloc.endswith('cs.ucl.ac.uk'):
                 results.append(url_normalize(domain))
                 if len(results) >= max_rows:
-                    break
+                    return results
         i += 10
 
     return results
 
 
 def get_solr(query, max_rows=10):
-    url = 'http://138.68.161.137:8983/solr/files/select?wt=json&rows={max_rows}&fl=url&q=\"{query}\"'
+    url = 'http://138.68.161.137:8983/solr/ucl/select?wt=json&rows={max_rows}&fl=url&q=\"{query}\"'
 
     json_response = requests.get(url.format(
         max_rows=max_rows, query=query.replace(' ', '+'))).json()
@@ -87,19 +87,47 @@ def url_normalize(url):
 
 
 if __name__ == '__main__':
+    import os
+    import json
+    import sys
+    from collections import defaultdict
+    
     parser = argparse.ArgumentParser()
     parser.add_argument('query', help='query')
     parser.add_argument('-r', nargs='?', dest='rows', type=int, default=10,
                         help='the number of results')
+    parser.add_argument('-o', nargs='?', dest='output', default=None,
+                        help='output path to save the results in json')
     args = parser.parse_args()
 
     query = args.query
     rows = args.rows
+    output = args.output
 
-    solr_result = get_solr(query, rows)
-    google_result = get_google(query, rows)
-    url_result = get_ucl(query, rows)
+    if os.path.isfile(query):
+        with open(query) as f:
+            queries = f.readlines()
+        queries = filter(lambda q: q and not q.startswith(
+            '#'), map(str.strip, queries))
+        print len(queries), ' queries'
+    else:
+        queries = [query]
 
-    result = zip(range(1,rows+1),google_result, url_result, solr_result)
+    result_dict = defaultdict(dict)
 
-    print tabulate(result, headers=['','google', 'ucl', 'solr'], tablefmt='simple')
+    for i, q in enumerate(queries):
+        result_dict[q]['solr'] = solr_result = get_solr(q, rows)
+        result_dict[q]['google'] = google_result = get_google(q, rows)
+        result_dict[q]['ucl'] = url_result = get_ucl(q, rows)
+
+        result = zip(range(1, rows + 1), google_result,
+                     url_result, solr_result)
+
+        print 'search ', i, ': ', q
+        print tabulate(result, headers=['', 'google', 'ucl', 'solr'], tablefmt='simple')
+        print
+        sys.stdout.flush()
+
+    if output is not None:
+        with open(output, 'w') as f:
+            json.dump(result_dict, f)
