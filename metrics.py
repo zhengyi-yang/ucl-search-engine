@@ -23,9 +23,13 @@ def precision_recall(retrieved, relevant):
     return precision, recall
 
 
-def f_measure(retrieved, relevant, alaph=0.5):
+def f_measure(retrieved, relevant, beta=1):
     p, r = precision_recall(retrieved, relevant)
-    f = 1 / (alaph / p + (1 - alaph) / r)
+
+    if p == 0 and r == 0:
+        return 0
+
+    f = (1 + beta * beta) * ((p * r) / (beta * beta * p + r))
 
     return f
 
@@ -166,7 +170,7 @@ def rbd(rank1, rank2, p=0.9):
     return 1 - rbo(rank1, rank2, p)
 
 
-def ndcg(retrieved, relevant, dcg_type=0):
+def ndcg(retrieved, relevant, max_score=100, dcg_type=0):
     def _dcg(rank_rel):
         result = 0.
         for i, rel in enumerate(rank_rel):
@@ -182,6 +186,6 @@ def ndcg(retrieved, relevant, dcg_type=0):
     def _ndcg(rank_rel):
         return _dcg(rank_rel) / _idcg(rank_rel)
 
-    rel_dict = {r: 1 / (i + 1) for i, r in enumerate(relevant)}
+    rel_dict = {r: max_score - i for i, r in enumerate(relevant)}
     rank_rel = [rel_dict.get(r, 0) for r in retrieved]
     return _ndcg(rank_rel)
