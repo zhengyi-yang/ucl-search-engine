@@ -35,7 +35,7 @@ def get_google(query, max_rows=10, num=None):
 
         for result in found:
             domain = result.attrs['href']
-            results.append(url_normalize(domain))
+            results.append(domain)
 
         if i == 0 and len(results) > num:
             results = results[len(results) - num:]
@@ -63,7 +63,7 @@ def get_ucl_cs(query, max_rows=10):
 
         for result in found:
             domain = result.text
-            results.append(url_normalize(domain))
+            results.append(domain)
             if len(results) >= max_rows:
                 return results
         i += 10
@@ -90,7 +90,7 @@ def get_ucl(query, max_rows=10):
         for result in found:
             domain = result.text
             if urlparse.urlparse(domain).netloc.endswith('cs.ucl.ac.uk'):
-                results.append(url_normalize(domain))
+                results.append(domain)
                 if len(results) >= max_rows:
                     return results
         i += 10
@@ -104,8 +104,7 @@ def get_solr(query, max_rows=10):
 
     json_response = requests.get(url).json()
 
-    response = [url_normalize(r['url'][0])
-                for r in json_response['response']['docs']]
+    response = [r['url'][0] for r in json_response['response']['docs']]
 
     return response
 
