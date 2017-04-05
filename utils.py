@@ -43,6 +43,34 @@ def get_google(query, max_rows=10, num=None):
     return results[:max_rows]
 
 
+def get_ucl_cs(query, max_rows=10):
+
+    results = []
+
+    url = 'http://search2.ucl.ac.uk/s/search.html?' + \
+        urlencode({'query': query}) + \
+        '&Submit=&collection=ucl-public-meta&subsite=cs&start_rank={start}'
+
+    i = 1
+    while 1:
+        r = requests.get(url.format(start=i))
+        data = r.text
+        soup = BeautifulSoup(data, "lxml")
+
+        found = soup.findAll('cite')
+        if not found:
+            break
+
+        for result in found:
+            domain = result.text
+            results.append(url_normalize(domain))
+            if len(results) >= max_rows:
+                return results
+        i += 10
+
+    return results
+
+
 def get_ucl(query, max_rows=10):
     results = []
 
@@ -118,7 +146,7 @@ if __name__ == '__main__':
     for i, q in enumerate(queries):
         result_dict[q]['solr'] = solr_result = get_solr(q, rows)
         result_dict[q]['google'] = google_result = get_google(q, rows)
-        result_dict[q]['ucl'] = url_result = get_ucl(q, rows)
+        result_dict[q]['ucl'] = url_result = get_ucl_cs(q, rows)
 
         result = zip(range(1, rows + 1), google_result,
                      url_result, solr_result)
