@@ -89,7 +89,6 @@ def url_normalize(url):
 if __name__ == '__main__':
     import os
     import json
-    import sys
     from collections import defaultdict
     
     parser = argparse.ArgumentParser()
@@ -126,7 +125,6 @@ if __name__ == '__main__':
         print 'search ', i, ': ', q
         print tabulate(result, headers=['', 'google', 'ucl', 'solr'], tablefmt='simple')
         print
-        sys.stdout.flush()
 
     if output is not None:
         with open(output, 'w') as f:
