@@ -23,24 +23,28 @@ def get_google(query, max_rows=10, num=None):
           "+site:cs.ucl.ac.uk&start={start}&num=" + str(num)
 
     useragent = 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36'
-    for i in xrange((max_rows - 1) / num + 1):
-        r = requests.get(url.format(start=i * num),
+
+    i = 0
+
+    while 1:
+        r = requests.get(url.format(start=i),
                          headers={'User-agent': useragent})
         data = r.text
         soup = BeautifulSoup(data, "lxml")
 
-        found = soup.select('.g .r a')
+        found = soup.select('.srg .g .r a')
         if not found:
             break
 
         for result in found:
             domain = result.attrs['href']
             results.append(domain)
+            if len(results) >= max_rows:
+                return results
 
-        if i == 0 and len(results) > num:
-            results = results[len(results) - num:]
+        i += num
 
-    return results[:max_rows]
+    return results
 
 
 def get_ucl_cs(query, max_rows=10):
@@ -57,7 +61,9 @@ def get_ucl_cs(query, max_rows=10):
         data = r.text
         soup = BeautifulSoup(data, "lxml")
 
-        found = soup.findAll('cite')
+        fb_results = soup.find('ol', {'id': 'fb-results'})
+
+        found = fb_results.findAll('cite')
         if not found:
             break
 
