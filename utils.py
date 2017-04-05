@@ -110,8 +110,10 @@ def get_solr(query, max_rows=10):
 
 
 def url_normalize(url):
-    # TO DO
-    return url
+    parsed = urlparse.urlparse(url)
+    scheme = "%s://" % parsed.scheme
+    normalized = parsed.geturl().replace(scheme, '', 1)
+    return normalized
 
 
 if __name__ == '__main__':
