@@ -8,6 +8,7 @@ Created on Sun Feb 26 22:28:04 2017
 import urlparse
 import requests
 import argparse
+from urllib import urlencode
 
 from bs4 import BeautifulSoup
 from tabulate import tabulate
@@ -18,7 +19,7 @@ def get_google(query, max_rows=10, num=None):
     results = []
     num = min(max_rows, 100)
 
-    url = "https://www.google.co.uk/search?q=" + query.replace(' ', '+') + \
+    url = "https://www.google.co.uk/search?" + urlencode({'q': query}) + \
           "+site:cs.ucl.ac.uk&start={start}&num=" + str(num)
 
     useragent = 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36'
@@ -45,7 +46,7 @@ def get_google(query, max_rows=10, num=None):
 def get_ucl(query, max_rows=10):
     results = []
 
-    url = 'https://search2.ucl.ac.uk/s/search.html?query=' + query.replace(' ', '+') +  \
+    url = 'https://search2.ucl.ac.uk/s/search.html?' + urlencode({'query': query}) +  \
         '&collection=website-meta&profile=_website&tab=websites&submit=Go&start_rank={start}'
 
     i = 1
@@ -70,10 +71,10 @@ def get_ucl(query, max_rows=10):
 
 
 def get_solr(query, max_rows=10):
-    url = 'http://138.68.161.137:8983/solr/ucl/select?wt=json&rows={max_rows}&fl=url&q=\"{query}\"'
+    url = 'http://138.68.161.137:8983/solr/ucl/select?wt=json&rows=' + str(max_rows) +\
+          '&fl=url&' + urlencode({'q': query})
 
-    json_response = requests.get(url.format(
-        max_rows=max_rows, query=query.replace(' ', '+'))).json()
+    json_response = requests.get(url).json()
 
     response = [url_normalize(r['url'][0])
                 for r in json_response['response']['docs']]
@@ -90,7 +91,7 @@ if __name__ == '__main__':
     import os
     import json
     from collections import defaultdict
-    
+
     parser = argparse.ArgumentParser()
     parser.add_argument('query', help='query')
     parser.add_argument('-r', nargs='?', dest='rows', type=int, default=10,
