@@ -1,3 +1,4 @@
 lxml
 BeautifulSoup4
+requests
 tabulate
