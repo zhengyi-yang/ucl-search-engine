@@ -19,7 +19,20 @@ def get(url):
   else:
     status_code = response.status_code
     if status_code == 200:
-      return response.url
+      if url == response.url:
+        content = response.text
+        soup  = BeautifulSoup.BeautifulSoup(content)
+        meta=soup.find("meta",attrs={"http-equiv":"refresh"})
+        if meta != None:
+          m = re.search('((url)|(URL))=(.*)', meta['content'])
+          new_url = m.group(4).strip()
+          if 'http' not in new_url:
+            new_url = url + new_url
+          return new_url
+        else:
+          return response.url
+      else:
+        return response.url
     elif status_code == 301:
       return response.url
     else:
@@ -30,7 +43,6 @@ def update_dict(urls, dic):
   for url in urls:
     if (url not in dic) or (dic[url] == 'TIMEOUT'):
       get_urls.append(url)
-
   if get_urls:
     print len(get_urls)
     pool = Pool(len(get_urls))
@@ -58,25 +70,21 @@ if __name__ == '__main__':
   with open(file_name, 'r') as fp:
     json_file = json.load(fp)
 
-
   google_urls = []
   for query in json_file:
     google_urls += json_file[query]['google']
 
-  for url in google_urls:
-    result = re.match('^https?:\/\/.*\/$', url)
-    if result != None:
-      print url
-
   url_dict = update_dict(google_urls, url_dict)
+
+  
   with open('dict.json', 'w') as fp:
     json.dump(url_dict, fp)
 
   for query in json_file:
     filtered_urls = [url_dict[url] for url in json_file[query]['google']]
     filtered_urls = [url for url in filtered_urls if url!=None and url!='TIMEOUT']
+    filtered_urls = [url for url in filtered_urls if re.match('^https?://([a-z0-9]*\.)*cs.ucl.ac.uk/', url)!= None]
     json_file[query]['google'] = filtered_urls
-
 
   with open('%s_filtered.json' % file_name.split('.')[0], 'w') as fp:
     json.dump(json_file, fp)
