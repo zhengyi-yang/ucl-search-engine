@@ -65,7 +65,7 @@ def update_dict(urls, json_dict):
       for e in zip_url:
         dic[e[0]] = e[1]
       with open(json_dict, 'w') as fp:
-        json.dump(dic, fp)
+        json.dump(dic, fp, indent=4, sort_keys=True)
 
     pool.close()
 
@@ -82,7 +82,7 @@ def main(file_name):
 
   unfiltered_urls = []
   for query in json_file:
-    unfiltered_urls += [ ('http://%s' % url) for url in json_file[query] if not url.startswith('http')]
+    unfiltered_urls += [('http://%s' % url) if not url.startswith('http') else url for url in json_file[query]]
 
   url_dict = update_dict(unfiltered_urls, json_dict)
 
@@ -93,8 +93,6 @@ def main(file_name):
     filtered_urls = [url_dict[url] for url in json_file[query]]
     filtered_urls = [url for url in filtered_urls if url!=None and url!='TIMEOUT' and url!='TooManyRedirects']
     filtered_urls = [url for url in filtered_urls if re.match('^https?://([a-z0-9]*\.)*cs.ucl.ac.uk/', url)!= None]
-
-    # filtered_urls = [ ('http://%s' % url) for url in filtered_urls if not url.startswith('http')]
 
     print query, 'Original: %d , Filtered: %d' % (original_number, len(json_file[query]))
 
@@ -116,6 +114,3 @@ if __name__ == '__main__':
   args = parser.parse_args()
   file_name = args.json
   main(file_name)
-
-  
-
