@@ -80,27 +80,29 @@ def main(file_name):
   with open(file_name, 'r') as fp:
     json_file = json.load(fp)
 
-  google_urls = []
+  unfiltered_urls = []
   for query in json_file:
-    google_urls += json_file[query]['google']
+    unfiltered_urls += [ ('http://%s' % url) for url in json_file[query] if not url.startswith('http')]
 
-  url_dict = update_dict(google_urls, json_dict)
+  url_dict = update_dict(unfiltered_urls, json_dict)
 
   inject_urls = []
 
   for query in json_file:
-    print query
-    print 'Original:', len(json_file[query]['google']) 
-    filtered_urls = [url_dict[url] for url in json_file[query]['google']]
+    original_number = len(json_file[query]) 
+    filtered_urls = [url_dict[url] for url in json_file[query]]
     filtered_urls = [url for url in filtered_urls if url!=None and url!='TIMEOUT' and url!='TooManyRedirects']
     filtered_urls = [url for url in filtered_urls if re.match('^https?://([a-z0-9]*\.)*cs.ucl.ac.uk/', url)!= None]
-    json_file[query]['google'] = filtered_urls[:100]
+
+    # filtered_urls = [ ('http://%s' % url) for url in filtered_urls if not url.startswith('http')]
+
+    print query, 'Original: %d , Filtered: %d' % (original_number, len(json_file[query]))
+
+    json_file[query] = filtered_urls[:100]
     inject_urls += filtered_urls
-    print 'Filtered:', len(filtered_urls), len(json_file[query]['google'])
 
-  # print inject_urls
 
-  with open('google.txt','w') as fp:
+  with open('inject.txt','w') as fp:
     for url in inject_urls:
       fp.write('%s\n' % url)
 

@@ -28,8 +28,10 @@ def get_google(query, max_rows=10, num=None):
     i = 0
 
     while 1:
+        print url.format(start=i)
         r = requests.get(url.format(start=i),
                          headers={'User-agent': useragent})
+        print r
         data = r.text
         soup = BeautifulSoup(data, "lxml")
 
@@ -134,11 +136,15 @@ if __name__ == '__main__':
                         help='the number of results')
     parser.add_argument('-o', nargs='?', dest='output', default=None,
                         help='output path to save the results in json')
+    parser.add_argument('-g', dest='google', action='store_true', help='query google')
+    parser.add_argument('-u', dest='ucl', action='store_true', help='query ucl')
     args = parser.parse_args()
 
     query = args.query
     rows = args.rows
     output = args.output
+    query_google = args.google
+    query_ucl = args.ucl
 
     if os.path.isfile(query):
         with open(query) as f:
@@ -152,17 +158,39 @@ if __name__ == '__main__':
     result_dict = defaultdict(dict)
 
     for i, q in enumerate(queries):
-        result_dict[q]['solr'] = solr_result = get_solr(q, rows)
-        result_dict[q]['google'] = google_result = get_google(q, rows)
-        result_dict[q]['ucl'] = url_result = get_ucl_cs(q, rows)
+        result_dict['solr'][q] = solr_result = get_solr(q, rows)
+        if query_google:
+            result_dict['google'][q] = google_result = get_google(q, rows)
+            print google_result
+        if query_ucl:
+            result_dict['ucl'][q] = url_result = get_ucl_cs(q, rows)
 
-        result = zip(range(1, rows + 1), google_result,
-                     url_result, solr_result)
+        if query_google and query_ucl:
+            result = zip(range(1, rows + 1), google_result,
+                         url_result, solr_result)
+            headers = ['', 'google', 'ucl', 'solr']
+        elif query_google:
+            result = zip(range(1, rows + 1), google_result, solr_result)
+            headers = ['', 'google', 'solr']
+        elif query_ucl:
+            result = zip(range(1, rows + 1), url_result, solr_result)
+            headers = ['', 'ucl', 'solr']
+        else:
+            result = zip(range(1, rows + 1), solr_result)
+            headers = ['', 'solr']
 
         print 'search ', i, ': ', q
-        print tabulate(result, headers=['', 'google', 'ucl', 'solr'], tablefmt='simple')
-        print
+        print tabulate(result, headers=headers, tablefmt='simple')
 
     if output is not None:
         with open(output, 'w') as f:
-            json.dump(result_dict, f)
+            json.dump(result_dict['solr'], f)
+        if query_google:
+            with open('google_%s' % output, 'w') as f:
+                json.dump(result_dict['google'], f)
+        if query_ucl:
+            with open('ucl_%s' % output, 'w') as f:
+                json.dump(result_dict['ucl'], f)
+
+
+
