@@ -4,7 +4,9 @@ import os
 import requests
 import json
 import re
+import argparse
 from multiprocessing import Pool
+from pprint import pprint
 import BeautifulSoup
 
 def get(url):
@@ -16,57 +18,65 @@ def get(url):
     return None
   except requests.exceptions.ConnectionError:
     return 'TIMEOUT'
+  except requests.exceptions.TooManyRedirects:
+    return 'TooManyRedirects'
+    # raise
   else:
     status_code = response.status_code
     if status_code == 200:
       if url == response.url:
-        content = response.text
-        soup  = BeautifulSoup.BeautifulSoup(content)
-        meta=soup.find("meta",attrs={"http-equiv":"refresh"})
-        if meta != None:
-          m = re.search('((url)|(URL))=(.*)', meta['content'])
-          new_url = m.group(4).strip()
-          if 'http' not in new_url:
-            new_url = url + new_url
-          return new_url
-        else:
-          return response.url
-      else:
-        return response.url
+        if re.match('^https?:\/\/.*\/$', url) != None:
+          content = response.text
+          soup  = BeautifulSoup.BeautifulSoup(content)
+          meta=soup.find("meta",attrs={"http-equiv":"refresh"})
+          if meta != None:
+            m = re.search('((url)|(URL))=(.*)', meta['content'])
+            new_url = m.group(4).strip()
+            if 'http' not in new_url:
+              new_url = url + new_url
+            return new_url
+      return response.url
     elif status_code == 301:
       return response.url
     else:
       return None
 
-def update_dict(urls, dic):
-  get_urls = []
-  for url in urls:
-    if (url not in dic) or (dic[url] == 'TIMEOUT'):
-      get_urls.append(url)
+def update_dict(urls, json_dict):
+  if os.path.exists(json_dict):
+    with open(json_dict, 'r') as fp:
+      dic = json.load(fp)
+  else:
+    dic = dict()
+
+  get_urls = [url for url in urls if (url not in dic) or (dic[url] == 'TIMEOUT')]
+
   if get_urls:
     print len(get_urls)
-    pool = Pool(len(get_urls))
-    new_urls = pool.map(get, get_urls)
-    zip_url = zip(get_urls, new_urls)
+    pool_size = len(get_urls)
+    if pool_size > 100:
+      pool_size = 100
+    pool = Pool(pool_size)
 
-    from pprint import pprint
-    pprint(zip_url)
-
-    for e in zip_url:
-      dic[e[0]] = e[1]
+    for i in range(0, len(get_urls), 100):
+      url_slice = get_urls[i:i+100]
+      new_urls = pool.map(get, url_slice)
+      zip_url = zip(url_slice, new_urls)
+      pprint(zip_url)
+      for e in zip_url:
+        dic[e[0]] = e[1]
+      with open(json_dict, 'w') as fp:
+        json.dump(dic, fp)
 
     pool.close()
 
+  # with open(json_dict, 'w') as fp:
+  #   json.dump(url_dict, fp)
+
   return dic
 
-if __name__ == '__main__':
-  if os.path.exists('dict.json'):
-    with open('dict.json', 'r') as fp:
-      url_dict = json.load(fp)
-  else:
-    url_dict = dict()
+def main(file_name):
+  json_dict = 'dict.json'
 
-  file_name = 'BM25.json'
   with open(file_name, 'r') as fp:
     json_file = json.load(fp)
 
@@ -74,18 +84,36 @@ if __name__ == '__main__':
   for query in json_file:
     google_urls += json_file[query]['google']
 
-  url_dict = update_dict(google_urls, url_dict)
+  url_dict = update_dict(google_urls, json_dict)
 
-  
-  with open('dict.json', 'w') as fp:
-    json.dump(url_dict, fp)
+  inject_urls = []
 
   for query in json_file:
+    print query
+    print 'Original:', len(json_file[query]['google']) 
     filtered_urls = [url_dict[url] for url in json_file[query]['google']]
-    filtered_urls = [url for url in filtered_urls if url!=None and url!='TIMEOUT']
+    filtered_urls = [url for url in filtered_urls if url!=None and url!='TIMEOUT' and url!='TooManyRedirects']
     filtered_urls = [url for url in filtered_urls if re.match('^https?://([a-z0-9]*\.)*cs.ucl.ac.uk/', url)!= None]
-    json_file[query]['google'] = filtered_urls
+    json_file[query]['google'] = filtered_urls[:100]
+    inject_urls += filtered_urls
+    print 'Filtered:', len(filtered_urls), len(json_file[query]['google'])
+
+  # print inject_urls
+
+  with open('google.txt','w') as fp:
+    for url in inject_urls:
+      fp.write('%s\n' % url)
 
   with open('%s_filtered.json' % file_name.split('.')[0], 'w') as fp:
     json.dump(json_file, fp)
+
+
+if __name__ == '__main__':
+  parser = argparse.ArgumentParser()
+  parser.add_argument('json', help='json file')
+  args = parser.parse_args()
+  file_name = args.json
+  main(file_name)
+
+  
 

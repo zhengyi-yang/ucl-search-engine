@@ -15,6 +15,7 @@ from tabulate import tabulate
 
 
 def get_google(query, max_rows=10, num=None):
+    max_rows = max_rows * 2
 
     results = []
     num = min(max_rows, 100)
