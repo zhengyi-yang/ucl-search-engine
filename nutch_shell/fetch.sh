@@ -1,4 +1,7 @@
-#!/bin/bash         
+#!/bin/bash
+
+export NUTCH_HOME=../apache-nutch-1.12/runtime/local/
+pushd $NUTCH_HOME
 
 if [ -z "$1" ]; then
   count=1
@@ -13,3 +16,5 @@ for i in $(seq 1 $count); do
   bin/nutch parse $s1
   bin/nutch updatedb crawl/crawldb $s1
 done
+
+popd
