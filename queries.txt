@@ -3,24 +3,24 @@
 home
 internship
 computer
-neurosciences
-physics
-maths
+prospective
+career
+GCHQ
 image
-careers
+Woman
 movies
 education
 chinese
-epidemiology
+Diego
 toilet
 chandler
-edinburg
+degree
 Australia
 Alumni
 ranking
 Accommodation
 Studentships
-Brexit
+ranking
 COMPGS01
 
 
@@ -29,13 +29,13 @@ english language
 conditional offer
 computer science
 data science
-Institute of Making
+Student Union
 nobel prize
 new student centre 
 book a room
 computer science entry requirements
 imperial college london
-ELECTRONIC & ELECTRICAL ENGINEERING
+BLOOMSBURY FITNESS
 CHRISTOPHER INGOLD BUILDING
 
 
@@ -50,7 +50,7 @@ Dario Alfè
 
 # sentence
 Has anyone got an offer from UCL for Sept 2016 start?
-is ucl a good university or not
+is ucl CS department good or not
 how is the weather in london
 what is the full name of ucl
 to be or not to be
@@ -62,7 +62,7 @@ prospectve
 contemporar
 data miningg
 Micrsoft
-neurosceince
+Voluntering
 
 # with special characters
 plug-in
