@@ -21,6 +21,37 @@ import org.apache.nutch.util.NutchConfiguration;
 public class PageRank extends Configured implements Tool {
   private static final Logger LOG = LoggerFactory
       .getLogger(MethodHandles.lookup().lookupClass());
+    
+    
+  /**
+   * Default constructor.
+   */
+  public PageRank() {
+    super();
+  }
+
+  /**
+   * Configurable constructor.
+   */
+  public PageRank(Configuration conf) {
+    super(conf);
+  }
+    
+  /**
+   * Runs the complete link analysis job. The complete job determins rank one
+   * score. Then runs through a given number of invert and analyze iterations,
+   * by default 10. And finally replaces the NodeDb in the WebGraph with the
+   * link rank output.
+   * 
+   * @param webGraphDb
+   *          The WebGraph to run link analysis on.
+   * 
+   * @throws IOException
+   *           If an error occurs during link analysis.
+   */
+  public void analyze(Path webGraphDb) throws IOException {
+    
+  }
 
   public static void main(String[] args) throws Exception {
     int res = ToolRunner.run(NutchConfiguration.create(), new PageRank(), args);
