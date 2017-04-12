@@ -35,5 +35,9 @@
 # skip URLs with slash-delimited segment that repeats 3+ times, to break loops
 -.*(/[^/]+)/[^/]+\1/[^/]+\1/
 
+-^https://cmiclab.cs.ucl.ac.uk/.*
+-^http://mtweb.cs.ucl.ac.uk/mus/.*
+
 # accept anything else
-+.
+# +.
++^https?://([a-z0-9]*\.)*cs.ucl.ac.uk/

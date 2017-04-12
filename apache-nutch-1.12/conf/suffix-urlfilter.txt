@@ -68,6 +68,7 @@
 .mpeg
 .mpg
 .mpe
+.mp4
 .mp3
 .mp2
 .aac
@@ -100,3 +101,11 @@
 # disc-images
 .iso
 .bin
+
+.class
+.bib
+.tex
+.c
+.cpp
+.h
+.java
