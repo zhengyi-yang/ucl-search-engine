@@ -14,7 +14,7 @@ for i in $(seq 1 $count); do
   s1=`ls -d crawl/segments/2* | tail -1`
   bin/nutch fetch $s1
   bin/nutch parse $s1
-  bin/nutch updatedb crawl/crawldb $s1
+  bin/nutch updatedb crawl/crawldb $s1 -filter
 done
 
 popd

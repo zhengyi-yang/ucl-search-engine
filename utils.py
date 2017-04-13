@@ -28,10 +28,8 @@ def get_google(query, max_rows=10, num=None):
     i = 0
 
     while 1:
-        print url.format(start=i)
         r = requests.get(url.format(start=i),
                          headers={'User-agent': useragent})
-        print r
         data = r.text
         soup = BeautifulSoup(data, "lxml")
 
@@ -161,7 +159,6 @@ if __name__ == '__main__':
         result_dict['solr'][q] = solr_result = get_solr(q, rows)
         if query_google:
             result_dict['google'][q] = google_result = get_google(q, rows)
-            print google_result
         if query_ucl:
             result_dict['ucl'][q] = url_result = get_ucl_cs(q, rows)
 
