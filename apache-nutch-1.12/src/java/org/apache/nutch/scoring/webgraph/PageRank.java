@@ -33,26 +33,19 @@ import org.apache.nutch.util.FSUtils;
 import org.apache.nutch.protocol.Content;
 
 public class PageRank extends Configured implements Tool {
-  private static final Logger LOG = LoggerFactory
-      .getLogger(PageRank.class);
+  private static final Logger LOG = LoggerFactory.getLogger(PageRank.class);
     
-  /**
-   * Default constructor.
-   */
   public PageRank() {
     super();
   }
 
-  /**
-   * Configurable constructor.
-   */
   public PageRank(Configuration conf) {
     super(conf);
   }    
 
   private void readNodes(Path webGraphDb) throws IOException
   {
-    Path linkRank = new Path(webGraphDb, "linkrank");
+    Path pageRank = new Path(webGraphDb, "pagerank");
     Configuration conf = getConf();
     FileSystem fs = FileSystem.get(conf);
 
@@ -64,8 +57,8 @@ public class PageRank extends Configured implements Tool {
     SequenceFile.Reader reader = new SequenceFile.Reader(fs, nodeFile, conf);
 
     SequenceFile.Writer writer = SequenceFile.createWriter(conf, 
-      SequenceFile.Writer.file(newNodeFile), SequenceFile.Writer.keyClass(Text.class), 
-      SequenceFile.Writer.valueClass(Node.class));
+    SequenceFile.Writer.file(newNodeFile), SequenceFile.Writer.keyClass(Text.class), 
+    SequenceFile.Writer.valueClass(Node.class));
 
     Text key = new Text();
     Node node = new Node();
@@ -125,8 +118,35 @@ public class PageRank extends Configured implements Tool {
   {
     readNodes(webGraphDb);
     readOutlinks(webGraphDb);
+    
+    for(int i=0 ; i<10 ; i++){
+      //calculateScore(key, values, output);
+    }
+  }
+    
+  private void calculateScore(Text key, Iterator<ObjectWritable> values, OutputCollector<Text, Node> output) {
+    
+    float totalInlinkScore = 1f;
+
+    while (values.hasNext()) {
+
+      ObjectWritable next = values.next();
+      Object value = next.get();
+
+      LinkDatum linkDatum = (LinkDatum) value;
+        
+      float inlinkScore = linkDatum.getScore();
+      totalInlinkScore += inlinkScore;
+    }
+      
+    float linkRankScore = (1f - 0.85f) + (0.85f * totalInlinkScore);
+
+    Node outNode = WritableUtils.clone(node, conf);
+    outNode.setInlinkScore(linkRankScore);
+    output.collect(key, outNode);
   }
 
+    
   public static void main(String[] args) throws Exception {
     int res = ToolRunner.run(NutchConfiguration.create(), new PageRank(), args);
     System.exit(res);
