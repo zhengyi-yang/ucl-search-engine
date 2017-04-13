@@ -82,7 +82,7 @@ public class PageRank extends Configured implements Tool {
    * @throws IOException
    *           If an error occurs during link analysis.
    */
-  public void analyze(Path webGraphDb) throws IOException {
+  public void analyse(Path webGraphDb) throws IOException {
 
     Configuration conf = getConf();
     FileSystem fs = FileSystem.get(conf);
@@ -96,7 +96,7 @@ public class PageRank extends Configured implements Tool {
     iniitialiseScores(wgNodeDb, nodeDb);
     float firstRankScore = (1f / (float) numberOfNodes);
 
-    while(isConverged==false){
+    while(isConverged()==false){
         //Apply the algorithm here
         
     }
@@ -144,7 +144,7 @@ public class PageRank extends Configured implements Tool {
 
       String webGraphDb = line.getOptionValue("webgraphdb");
       LOG.info("WebGraphDB: " + webGraphDb);
-      //analyze(new Path(webGraphDb));
+      analyse(new Path(webGraphDb));
       return 0;
     } catch (Exception e) {
       LOG.error("LinkAnalysis: " + StringUtils.stringifyException(e));
