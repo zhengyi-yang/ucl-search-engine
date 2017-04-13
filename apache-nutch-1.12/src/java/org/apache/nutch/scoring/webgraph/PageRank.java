@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.Iterator;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
@@ -29,6 +30,7 @@ import org.apache.hadoop.io.SequenceFile;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableUtils;
 import org.apache.hadoop.io.ObjectWritable;
+import org.apache.hadoop.mapred.OutputCollector;
 import org.apache.nutch.util.FSUtils;
 import org.apache.nutch.protocol.Content;
 
@@ -126,6 +128,8 @@ public class PageRank extends Configured implements Tool {
     
   private void calculateScore(Text key, Iterator<ObjectWritable> values, OutputCollector<Text, Node> output) {
     
+    Configuration conf = getConf();
+      
     float totalInlinkScore = 1f;
 
     while (values.hasNext()) {
