@@ -29,7 +29,7 @@ import org.apache.hadoop.io.SequenceFile;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableUtils;
 import org.apache.hadoop.io.ObjectWritable;
-
+import org.apache.nutch.util.FSUtils;
 import org.apache.nutch.protocol.Content;
 
 public class PageRank extends Configured implements Tool {
@@ -59,9 +59,13 @@ public class PageRank extends Configured implements Tool {
     Path wgNodeDb = new Path(webGraphDb, WebGraph.NODE_DIR);
     Path nodeFile = new Path(wgNodeDb, "part-00000/data");
 
+    Path newNodeFile = new Path(wgNodeDb, "part-00000/data2");
+
     SequenceFile.Reader reader = new SequenceFile.Reader(fs, nodeFile, conf);
 
-    List<LinkDatum> outlinks = new ArrayList<LinkDatum>();
+    SequenceFile.Writer writer = SequenceFile.createWriter(conf, 
+      SequenceFile.Writer.file(newNodeFile), SequenceFile.Writer.keyClass(Text.class), 
+      SequenceFile.Writer.valueClass(Node.class));
 
     Text key = new Text();
     Node node = new Node();
@@ -77,10 +81,50 @@ public class PageRank extends Configured implements Tool {
         System.out.println("  num inlinks: " + node.getNumInlinks());
         System.out.println("  num outlinks: " + node.getNumOutlinks());
 
+        Node outNode = WritableUtils.clone(node, conf);
+        outNode.setInlinkScore(1.0f);
+
+        writer.append(new Text(key), outNode);
     }
     System.out.println("Total Nodes: " + count);
     reader.close();
+    writer.close();
+
+    FSUtils.replace(fs, nodeFile, newNodeFile, true);
     fs.close();
+  }
+
+  private void readOutlinks(Path webGraphDb) throws IOException
+  {
+    Configuration conf = getConf();
+    FileSystem fs = FileSystem.get(conf);
+
+    Path wgNodeDb = new Path(webGraphDb, WebGraph.OUTLINK_DIR);
+    Path outlinkFile = new Path(wgNodeDb, "part-00000/data");
+
+    SequenceFile.Reader reader = new SequenceFile.Reader(fs, outlinkFile, conf);
+
+    Text key = new Text();
+    LinkDatum outlinks = new LinkDatum();
+
+    Integer count = 0;
+
+    while (reader.next(key, outlinks)) {
+        count += 1;
+
+        System.out.println(key + ":");
+        System.out.println(outlinks);
+    }
+
+    reader.close();
+    fs.close();
+  }
+
+
+  private void readWebgraph(Path webGraphDb) throws IOException
+  {
+    readNodes(webGraphDb);
+    readOutlinks(webGraphDb);
   }
 
   public static void main(String[] args) throws Exception {
@@ -117,7 +161,7 @@ public class PageRank extends Configured implements Tool {
 
       String webGraphDb = line.getOptionValue("webgraphdb");
 
-      readNodes(new Path(webGraphDb));
+      readWebgraph(new Path(webGraphDb));
       return 0;
     } catch (Exception e) {
       LOG.error("LinkAnalysis: " + StringUtils.stringifyException(e));
