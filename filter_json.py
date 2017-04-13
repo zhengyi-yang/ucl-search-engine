@@ -89,8 +89,9 @@ def main(file_name):
   inject_urls = []
 
   for query in json_file:
-    original_number = len(json_file[query]) 
-    filtered_urls = [url_dict[url] for url in json_file[query]]
+    original_number = len(json_file[query])
+
+    filtered_urls = [url_dict[url] if url.startswith('http') else url_dict[('http://%s' % url)] for url in json_file[query]]
     filtered_urls = [url for url in filtered_urls if url!=None and url!='TIMEOUT' and url!='TooManyRedirects']
     filtered_urls = [url for url in filtered_urls if re.match('^https?://([a-z0-9]*\.)*cs.ucl.ac.uk/', url)!= None]
 
