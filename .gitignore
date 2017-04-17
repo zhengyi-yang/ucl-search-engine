@@ -92,3 +92,5 @@ ENV/
 
 # Compiled class file
 *.class
+
+tmp/

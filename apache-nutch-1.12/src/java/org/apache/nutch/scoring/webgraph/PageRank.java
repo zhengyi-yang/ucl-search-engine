@@ -1,6 +1,11 @@
 package org.apache.nutch.scoring.webgraph;
 
-import java.lang.invoke.MethodHandles;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Iterator;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
@@ -11,6 +16,7 @@ import org.apache.commons.cli.OptionBuilder;
 import org.apache.commons.cli.Options;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Tool;
@@ -19,97 +25,132 @@ import org.apache.nutch.util.NutchConfiguration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.io.SequenceFile;
+import org.apache.hadoop.io.Writable;
+import org.apache.hadoop.io.WritableUtils;
+import org.apache.hadoop.io.ObjectWritable;
+import org.apache.hadoop.mapred.OutputCollector;
+import org.apache.nutch.util.FSUtils;
+import org.apache.nutch.protocol.Content;
 
 public class PageRank extends Configured implements Tool {
-  private static final Logger LOG = LoggerFactory
-      .getLogger(MethodHandles.lookup().lookupClass());
+  private static final Logger LOG = LoggerFactory.getLogger(PageRank.class);
     
-    
-  /**
-   * Default constructor.
-   */
   public PageRank() {
     super();
   }
 
-  /**
-   * Configurable constructor.
-   */
   public PageRank(Configuration conf) {
     super(conf);
-  }
-	
+  }    
 
-  
-    
-  private int getNumberOfNodes(FileSystem fs, Path webGraphDb) throws IOException {
-
-    String numberOfNodes = "";
-      
-    Path tempDir = new Path(webGraphDb, "tempCounterDir");
-    FSDataInputStream readNumberOfNodes = fs.open(new Path(tempDir, "part-00000"));
-    BufferedReader buffer = new BufferedReader(new InputStreamReader(readNumberOfNodes));
-    String numberOfLines = buffer.readLine();
-    buffer.close();
-    readNumberOfNodes.close();
-
-    if (numberOfLines == null || numberOfLines.length() == 0) {
-      fs.delete(tempDir, true);
-      throw new IOException("WebGraph is empty!");
-    }  
-      
-    fs.delete(tempDir, true);
-    numberOfNodes = numberOfLines.split("\\s+")[1];
-    
-    return Integer.parseInt(numberOfNodes);  
-
-  }
-	
-	
-  private boolean isConverged(){
-      
-      return true;
-  }
-      
-  
-    
-  /**
-   * This is the PageRank link analsis method.
-   * 
-   * @param webGraphDb
-   *          The WebGraph to run link analysis on.
-   * 
-   * @throws IOException
-   *           If an error occurs during link analysis.
-   */
-  public void analyse(Path webGraphDb) throws IOException {
-
+  private void readNodes(Path webGraphDb) throws IOException
+  {
+    Path pageRank = new Path(webGraphDb, "pagerank");
     Configuration conf = getConf();
     FileSystem fs = FileSystem.get(conf);
 
-    if (!fs.exists(linkRank)) {
-      fs.mkdirs(linkRank);
-    } 
-	  
-    //Initialise the PageRank scores of the webgraph
-    int numberOfNodes = getNumberOfNodes(fs, webGraphDb);
-    iniitialiseScores(wgNodeDb, nodeDb);
-    float firstRankScore = (1f / (float) numberOfNodes);
+    Path wgNodeDb = new Path(webGraphDb, WebGraph.NODE_DIR);
+    Path nodeFile = new Path(wgNodeDb, "part-00000/data");
 
-    while(isConverged()==false){
-        //Apply the algorithm here
-        
+    Path newNodeFile = new Path(wgNodeDb, "part-00000/data2");
+
+    SequenceFile.Reader reader = new SequenceFile.Reader(fs, nodeFile, conf);
+
+    SequenceFile.Writer writer = SequenceFile.createWriter(conf, 
+    SequenceFile.Writer.file(newNodeFile), SequenceFile.Writer.keyClass(Text.class), 
+    SequenceFile.Writer.valueClass(Node.class));
+
+    Text key = new Text();
+    Node node = new Node();
+
+    Integer count = 0;
+
+    while (reader.next(key, node)) {
+        count += 1;
+
+        System.out.println(key + ":");
+        System.out.println("  inlink score: " + node.getInlinkScore());
+        System.out.println("  outlink score: " + node.getOutlinkScore());
+        System.out.println("  num inlinks: " + node.getNumInlinks());
+        System.out.println("  num outlinks: " + node.getNumOutlinks());
+
+        Node outNode = WritableUtils.clone(node, conf);
+        outNode.setInlinkScore(1.0f);
+
+        writer.append(new Text(key), outNode);
     }
-	  
-	  
-	  
+    System.out.println("Total Nodes: " + count);
+    reader.close();
+    writer.close();
 
-	  
-    // replace the NodeDb in the WebGraph with the final output of analysis
-    FSUtils.replace(fs, wgNodeDb, nodeDb, true);
-
+    FSUtils.replace(fs, nodeFile, newNodeFile, true);
+    fs.close();
   }
 
+  private void readOutlinks(Path webGraphDb) throws IOException
+  {
+    Configuration conf = getConf();
+    FileSystem fs = FileSystem.get(conf);
+
+    Path wgNodeDb = new Path(webGraphDb, WebGraph.OUTLINK_DIR);
+    Path outlinkFile = new Path(wgNodeDb, "part-00000/data");
+
+    SequenceFile.Reader reader = new SequenceFile.Reader(fs, outlinkFile, conf);
+
+    Text key = new Text();
+    LinkDatum outlinks = new LinkDatum();
+
+    Integer count = 0;
+
+    while (reader.next(key, outlinks)) {
+        count += 1;
+
+        System.out.println(key + ":");
+        System.out.println(outlinks);
+    }
+
+    reader.close();
+    fs.close();
+  }
+
+
+  private void readWebgraph(Path webGraphDb) throws IOException
+  {
+    readNodes(webGraphDb);
+    readOutlinks(webGraphDb);
+    
+    for(int i=0 ; i<10 ; i++){
+      //calculateScore(key, values, output);
+    }
+  }
+    
+  private void calculateScore(Text key, Iterator<ObjectWritable> values, OutputCollector<Text, Node> output) {
+    
+    Configuration conf = getConf();
+      
+    float totalInlinkScore = 1f;
+
+    while (values.hasNext()) {
+
+      ObjectWritable next = values.next();
+      Object value = next.get();
+
+      LinkDatum linkDatum = (LinkDatum) value;
+        
+      float inlinkScore = linkDatum.getScore();
+      totalInlinkScore += inlinkScore;
+    }
+      
+    float linkRankScore = (1f - 0.85f) + (0.85f * totalInlinkScore);
+
+    Node outNode = WritableUtils.clone(node, conf);
+    outNode.setInlinkScore(linkRankScore);
+    output.collect(key, outNode);
+  }
+
+    
   public static void main(String[] args) throws Exception {
     int res = ToolRunner.run(NutchConfiguration.create(), new PageRank(), args);
     System.exit(res);
@@ -143,8 +184,8 @@ public class PageRank extends Configured implements Tool {
       }
 
       String webGraphDb = line.getOptionValue("webgraphdb");
-      LOG.info("WebGraphDB: " + webGraphDb);
-      analyse(new Path(webGraphDb));
+
+      readWebgraph(new Path(webGraphDb));
       return 0;
     } catch (Exception e) {
       LOG.error("LinkAnalysis: " + StringUtils.stringifyException(e));
