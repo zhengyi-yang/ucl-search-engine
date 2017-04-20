@@ -15,10 +15,13 @@ def precision_recall(retrieved, relevant):
     retrieved_set = set(retrieved)
     relevant_set = set(relevant)
 
+    if not retrieved_set or not relevant_set:
+        return 0., 0.
+
     # retrieved and relevant
-    a = len(retrieved_set.intersection(relevant_set))
-    precision = a / len(retrieved_set)
-    recall = a / len(relevant_set)
+    tp = len(retrieved_set.intersection(relevant_set))
+    precision = tp / len(retrieved_set)
+    recall = tp / len(relevant_set)
 
     return precision, recall
 
@@ -27,7 +30,7 @@ def f_measure(retrieved, relevant, beta=1):
     p, r = precision_recall(retrieved, relevant)
 
     if p == 0 and r == 0:
-        return 0
+        return 0.
 
     f = (1 + beta * beta) * ((p * r) / (beta * beta * p + r))
 
@@ -46,10 +49,10 @@ def precision_recall_curves(ranked_list, relevant):
     return precisions, recalls
 
 
-def f_measure_curves(ranked_list, relevant, alaph=0.5):
+def f_measure_curves(ranked_list, relevant, beta=1):
     f_measures = []
     for i in xrange(len(ranked_list)):
-        f_measures.append(f_measure(ranked_list[:i + 1], relevant, alaph))
+        f_measures.append(f_measure(ranked_list[:i + 1], relevant, beta))
     return f_measures
 
 
@@ -58,6 +61,9 @@ def average_precision(ranked_list, relevant):
     Average of precisions at relevant documents
     '''
     precisions = precision_recall_curves(ranked_list, relevant)[0]
+
+    if not precisions:
+        return 0.
 
     return sum(precisions) / len(precisions)
 
@@ -76,8 +82,8 @@ def expected_search_length(ranked_list, relevant):
     relevant_set = set(relevant)
     for i, r in enumerate(ranked_list):
         if r in relevant_set:
-            break
-    return i
+            return i
+    return float('inf')
 
 
 def reciprocal_rank(ranked_list, relevant):
@@ -101,6 +107,9 @@ def average_overlap(rank1, rank2, depth=None):
         depth = l2
     elif depth > l2:
         raise ValueError('depth too large')
+
+    if depth == 0:
+        return 0
 
     for i in xrange(depth):
         intersection = set.intersection(set(rank1[:i + 1]), set(rank2[:i + 1]))
@@ -188,4 +197,6 @@ def ndcg(retrieved, relevant, max_score=100, dcg_type=0):
 
     rel_dict = {r: max_score - i for i, r in enumerate(relevant)}
     rank_rel = [rel_dict.get(r, 0) for r in retrieved]
+    if sum(rank_rel) == 0:
+        return 0
     return _ndcg(rank_rel)
