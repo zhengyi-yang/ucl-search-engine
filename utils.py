@@ -181,7 +181,7 @@ if __name__ == '__main__':
 
     if output is not None:
         with open(output, 'w') as f:
-            json.dump(result_dict['solr'], f)
+            json.dump(result_dict['solr'], f, indent=2, sort_keys=True)
         if query_google:
             with open('google_%s' % output, 'w') as f:
                 json.dump(result_dict['google'], f)
