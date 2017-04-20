@@ -5,7 +5,8 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.List;
 import java.util.ArrayList;
-import java.util.Iterator;
+import java.util.Map;
+import java.util.HashMap;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
@@ -45,52 +46,39 @@ public class PageRank extends Configured implements Tool {
     super(conf);
   }    
 
-  private void readNodes(Path webGraphDb) throws IOException
+  private HashMap<Text, Node> readNodes(Path webGraphDb) throws IOException
   {
-    Path pageRank = new Path(webGraphDb, "pagerank");
+    HashMap<Text, Node> nodeMap = new HashMap<Text, Node>();
     Configuration conf = getConf();
     FileSystem fs = FileSystem.get(conf);
 
     Path wgNodeDb = new Path(webGraphDb, WebGraph.NODE_DIR);
     Path nodeFile = new Path(wgNodeDb, "part-00000/data");
 
-    Path newNodeFile = new Path(wgNodeDb, "part-00000/data2");
-
     SequenceFile.Reader reader = new SequenceFile.Reader(fs, nodeFile, conf);
-
-    SequenceFile.Writer writer = SequenceFile.createWriter(conf, 
-    SequenceFile.Writer.file(newNodeFile), SequenceFile.Writer.keyClass(Text.class), 
-    SequenceFile.Writer.valueClass(Node.class));
 
     Text key = new Text();
     Node node = new Node();
 
-    Integer count = 0;
-
     while (reader.next(key, node)) {
-        count += 1;
-
-        System.out.println(key + ":");
-        System.out.println("  inlink score: " + node.getInlinkScore());
-        System.out.println("  outlink score: " + node.getOutlinkScore());
-        System.out.println("  num inlinks: " + node.getNumInlinks());
-        System.out.println("  num outlinks: " + node.getNumOutlinks());
+        LOG.debug(key + ":");
+        LOG.debug("  inlink score: " + node.getInlinkScore());
+        LOG.debug("  outlink score: " + node.getOutlinkScore());
+        LOG.debug("  num inlinks: " + node.getNumInlinks());
+        LOG.debug("  num outlinks: " + node.getNumOutlinks());
 
         Node outNode = WritableUtils.clone(node, conf);
-        outNode.setInlinkScore(1.0f);
-
-        writer.append(new Text(key), outNode);
+        nodeMap.put(new Text(key), outNode);
     }
-    System.out.println("Total Nodes: " + count);
-    reader.close();
-    writer.close();
 
-    FSUtils.replace(fs, nodeFile, newNodeFile, true);
+    reader.close();
     fs.close();
+    return nodeMap;
   }
 
-  private void readOutlinks(Path webGraphDb) throws IOException
+  private HashMap<Text, List<LinkDatum>> readOutlinks(Path webGraphDb) throws IOException
   {
+    HashMap<Text, List<LinkDatum>> outlinkMap = new HashMap<Text, List<LinkDatum>>();
     Configuration conf = getConf();
     FileSystem fs = FileSystem.get(conf);
 
@@ -100,56 +88,142 @@ public class PageRank extends Configured implements Tool {
     SequenceFile.Reader reader = new SequenceFile.Reader(fs, outlinkFile, conf);
 
     Text key = new Text();
-    LinkDatum outlinks = new LinkDatum();
+    LinkDatum outlink = new LinkDatum();
 
-    Integer count = 0;
+    while (reader.next(key, outlink)) {
+      if(!outlinkMap.containsKey(key)){
+        outlinkMap.put(new Text(key), new ArrayList<LinkDatum>());
+      }
 
-    while (reader.next(key, outlinks)) {
-        count += 1;
-
-        System.out.println(key + ":");
-        System.out.println(outlinks);
+      outlinkMap.get(key).add(WritableUtils.clone(outlink, conf));
     }
 
     reader.close();
     fs.close();
+    return outlinkMap;
   }
 
+  private void saveNodeDB(Path webGraphDb, HashMap<Text, Node> nodeMap) throws IOException
+  {
+    Configuration conf = getConf();
+    FileSystem fs = FileSystem.get(conf);
+
+    Path wgNodeDb = new Path(webGraphDb, WebGraph.NODE_DIR);
+    Path nodeFile = new Path(wgNodeDb, "part-00000/data");
+    Path newNodeFile = new Path(wgNodeDb, "part-00000/data2");
+
+    SequenceFile.Writer writer = SequenceFile.createWriter(conf, 
+        SequenceFile.Writer.file(newNodeFile), SequenceFile.Writer.keyClass(Text.class), 
+        SequenceFile.Writer.valueClass(Node.class));
+
+    for(Map.Entry<Text, Node> entry : nodeMap.entrySet())
+    {
+        Text key = entry.getKey();
+        Node node = entry.getValue();
+
+        writer.append(key, node);
+    }
+    writer.close();
+
+    FSUtils.replace(fs, nodeFile, newNodeFile, true);
+    fs.close();
+  }
+
+  private HashMap<Text, List<LinkDatum>> invertOutLinks(HashMap<Text, Node> nodeMap, HashMap<Text, List<LinkDatum>> outlinkMap)
+  {
+    Configuration conf = getConf();
+    HashMap<Text, List<LinkDatum>> inlinkMap = new HashMap<Text, List<LinkDatum>>();
+    for(Map.Entry<Text, Node> entry : nodeMap.entrySet())
+    {
+      Text key = entry.getKey();
+      Node node = entry.getValue();
+
+      List<LinkDatum> outlinks = outlinkMap.get(key);
+      String fromUrl = key.toString();
+      if(outlinks != null)
+      {
+        for(LinkDatum link : outlinks)
+        {
+          LinkDatum inlink = WritableUtils.clone(link, conf);
+          inlink.setUrl(fromUrl);
+          inlink.setScore(node.getOutlinkScore());
+
+          Text toUrl = new Text(link.getUrl());
+
+          LOG.debug("Inlink to " + toUrl);
+          LOG.debug("from " + inlink);
+
+          if(!inlinkMap.containsKey(toUrl))
+          {
+            inlinkMap.put(toUrl, new ArrayList<LinkDatum>());
+          }
+          inlinkMap.get(toUrl).add(inlink);
+        }
+      }
+    }
+    return inlinkMap;
+  }
+
+  private void calculateScore(HashMap<Text, Node> nodeMap, HashMap<Text, List<LinkDatum>> inlinkMap)
+  {
+    Configuration conf = getConf();
+    Float dampingFactor = 0.85f;
+    Integer totalNodes = nodeMap.size();
+
+    for(Map.Entry<Text, Node> entry : nodeMap.entrySet())
+    {
+      Text key = entry.getKey();
+      Node node = entry.getValue();
+
+      Float score = (1 - dampingFactor)/totalNodes;
+
+      List<LinkDatum> inlinks = inlinkMap.get(key);
+      if(inlinks != null)
+      {
+        for(LinkDatum link : inlinks)
+        {
+          score += dampingFactor*link.getScore();
+        }
+      }
+
+      node.setInlinkScore(score);
+    }
+  }
 
   private void readWebgraph(Path webGraphDb) throws IOException
   {
-    readNodes(webGraphDb);
-    readOutlinks(webGraphDb);
-    
-    for(int i=0 ; i<10 ; i++){
-      //calculateScore(key, values, output);
+    HashMap<Text, Node> nodeMap = readNodes(webGraphDb);
+    HashMap<Text, List<LinkDatum>> outlinkMap = readOutlinks(webGraphDb);
+
+    Integer totalNodes = nodeMap.size();
+    LOG.info("Total nodes: " + nodeMap.size());
+
+    for(Map.Entry<Text, Node> entry : nodeMap.entrySet())
+    {
+        Node node = entry.getValue();
+        node.setInlinkScore(1.0f / totalNodes);
     }
-  }
-    
-  private void calculateScore(Text key, Iterator<ObjectWritable> values, OutputCollector<Text, Node> output) {
-    
-    Configuration conf = getConf();
-      
-    float totalInlinkScore = 1f;
 
-    while (values.hasNext()) {
+    LOG.info("Initialised the score of all nodes to " + 1.0f/totalNodes);
 
-      ObjectWritable next = values.next();
-      Object value = next.get();
-
-      LinkDatum linkDatum = (LinkDatum) value;
-        
-      float inlinkScore = linkDatum.getScore();
-      totalInlinkScore += inlinkScore;
+    for(int i=0 ; i<10 ; i++)
+    {
+      HashMap<Text, List<LinkDatum>> inlinkMap = invertOutLinks(nodeMap, outlinkMap);
+      calculateScore(nodeMap, inlinkMap);
     }
-      
-    float linkRankScore = (1f - 0.85f) + (0.85f * totalInlinkScore);
 
-    Node outNode = WritableUtils.clone(node, conf);
-    outNode.setInlinkScore(linkRankScore);
-    output.collect(key, outNode);
+    for(Map.Entry<Text, Node> entry : nodeMap.entrySet())
+    {
+        Node node = entry.getValue();
+        LOG.debug(entry.getKey() + ":");
+        LOG.debug("  inlink score: " + node.getInlinkScore());
+        LOG.debug("  outlink score: " + node.getOutlinkScore());
+        LOG.debug("  num inlinks: " + node.getNumInlinks());
+        LOG.debug("  num outlinks: " + node.getNumOutlinks());
+    }
+
+    saveNodeDB(webGraphDb, nodeMap);
   }
-
     
   public static void main(String[] args) throws Exception {
     int res = ToolRunner.run(NutchConfiguration.create(), new PageRank(), args);
