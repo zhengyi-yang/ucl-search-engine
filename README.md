@@ -1,6 +1,6 @@
 # UCL Search Engine
 
-
+UCL IRDM 2017 Group Project - Option 1
 
 We are using both of the open source IR packages below: 
 - [solr](https://lucene.apache.org/solr) and [nutch](https://nutch.apache.org/)
@@ -8,63 +8,36 @@ We are using both of the open source IR packages below:
 
 ## Nutch Crawling
 
-1. Insert the following code into **nutch-site.xml** 
+1. Build nutch with `ant`.
 
-```xml
-<property>
- <name>http.agent.name</name>
- <value>My UCL Spider</value>
-</property>
+2. Create a `urls` directory under `apache-nutch-1.12/runtime/local`.
 
-<property>
-  <name>fetcher.threads.per.queue</name>
-  <value>5</value>
-  <description>This number is the maximum number of threads that
-    should be allowed to access a queue at one time. Setting it to 
-    a value > 1 will cause the Crawl-Delay value from robots.txt to
-    be ignored and the value of fetcher.server.min.delay to be used
-    as a delay between successive requests to the same server instead 
-    of fetcher.server.delay.
-   </description>
-</property>
+3. Create `seed.txt` file under `urls` and put `http://www.cs.ucl.ac.uk/` into the file.
 
-```
+4. Create new crawldb by executing `bin/nutch inject crawl/crawldb urls` under the `apache-nutch-1.12/runtime/local` folder.
 
-2. Replace the last line in **regex-urlfilter.txt** to
+5. Start crawling with our `fetch.sh` script which is under the `nutch_shell` folder in the format like `./fetch.sh <Iterations>`.
 
-```
-+^http://([a-z0-9]*\.)*ucl.ac.uk/
-```
+6. Dedup nutch by `bin/nutch dedup crawl/crawldb`.
 
+## PageRank
 
-3. Create **<NUTCH_HOME>/urls/seed.txt** and add `http://www.ucl.ac.uk/`.
+1. Generate webgraph by `bin/nutch webgraph -webgraphdb crawl/webgraphdb -segment crawl/segments/*`.
 
-4. Set `JAVA_HOME`.
+2. Execute PageRank by `bin/nutch org.apache.nutch.scoring.webgraph.PageRank -webgraphdb crawl/webgraphdb`.
 
-5. Run `bin/crawl urls/ crawl/ <NUM_OF_ROUNDS>`
+3. Update score in crawldb by `bin/nutch scoreupdater -crawldb crawl/crawldb -webgraphdb crawl/webgraphdb`.
 
+4. Put `scoring-link` into the `<value>` tag of the property with `<name>plugin.includes</name>` in `apache-nutch-1.12/runtime/local/conf/nutch-site.xml`. Or put it in `apache-nutch-1.12/conf/nutch-site.xml` and rebuild with ant.
 
-## LinkRank to PageRank
-
-Insert the following code into **nutch-site.xml**
-
-```xml
-<property>
-  <name>link.ignore.internal.host</name>
-  <value>false</value>
-  <description>Ignore outlinks to the same hostname.</description>
-</property>
-
-<property>
-  <name>link.ignore.internal.domain</name>
-  <value>false</value>
-  <description>Ignore outlinks to the same domain.</description>
-</property>
-
-```
+5. Reindex solr.
 
 ## Integrate Solr with Nutch
 
-Example: `bin/nutch solrindex http://localhost:8983/solr/<core_name> crawl/crawldb -linkdb crawl/linkdb/ crawl/segments/* -normalize -deleteGone` 
+1. Start solr server. 
 
+2. Create a new core `ucl` with `bin/solr create -c ucl`.
 
+3. Modify the schema or ucl by modifying `managed-schema.xml` and restart server or throuth the solr api. Change type of `content` to `text_general`.
+
+4. Index with nutch by `bin/nutch solrindex http://localhost:8983/solr/ucl crawl/crawldb crawl/segments/* -normalize -deleteGone`. 
